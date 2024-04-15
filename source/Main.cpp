@@ -75,6 +75,17 @@ public:
             }
         };
 
+
+        static ThiscallEvent <
+            AddressList<0x66F049, H_CALL>,
+            PRIORITY_BEFORE,
+            ArgPick6N<CPathFind*, 0, int, 1, const CVector*, 2, const CVector*, 3, CNodeAddress*, 4, CNodeAddress**, 5>,
+            void(CPathFind*, int, const CVector*, const CVector*, CNodeAddress*, CNodeAddress**)
+        > onComputePathFind;
+
+        onComputePathFind += [](CPathFind* pathFind, int nodeType, const CVector* ref_origin, const CVector* ref_dest, CNodeAddress* ref_firstNode, CNodeAddress** ref_route) {
+            std::cout << "onComputePathFind" << std::endl;
+        };
     }
         
 
