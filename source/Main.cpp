@@ -40,9 +40,20 @@ public:
     }
         
 private:
+    const CVector* pathnode_from_pos;
+    const CVector* pathnode_to_pos;
 
     void HookInstallEvents()
     {
+        Events::drawHudEvent += [&]() {
+            if (pathnode_from_pos) {
+                PrintText2ScreenFromWorldPos("ORIGEM", *pathnode_from_pos, { 0, 0, 255, 255 });
+            }
+
+            if (pathnode_to_pos) {
+                PrintText2ScreenFromWorldPos("DESTINO", *pathnode_to_pos, { 0, 255, 255, 255 });
+            }
+        };
 
         static StdcallEvent <AddressList<0x4E9EF3, H_CALL>, PRIORITY_BEFORE, ArgPickN<signed char, 0>, void(signed char)> onGetRadioStationName;
         onGetRadioStationName += [](signed char station) {
@@ -115,6 +126,9 @@ private:
 
         onComputePathFind += [&](CPathFind* pathFind, int nodeType, const CVector* ref_origin, const CVector* ref_dest, CNodeAddress* ref_firstNode, CNodeAddress** ref_route) mutable {
             std::cout << "onComputePathFind" << std::endl;
+
+            pathnode_from_pos = ref_origin;
+            pathnode_to_pos = ref_dest;
         };
 
         patch::RedirectCall({ 0x747476 }, SetSaveDirectoryHook);
