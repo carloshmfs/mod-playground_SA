@@ -2,6 +2,7 @@
 #include "Events.h"
 #include "CSprite.h"
 #include "CFont.h"
+#include "CTheScripts.h"
 
 
 #include <iostream>
@@ -22,6 +23,11 @@ int SetSaveDirectoryHook(char* name)
     return 0;
 }
 
+void JetPackCheatHook()
+{
+    std::cout << "JetPackCheatHook" << std::endl;
+}
+
 using namespace plugin;
 
 
@@ -35,8 +41,9 @@ public:
         
 private:
 
-    void HookInstallEvents() const
+    void HookInstallEvents()
     {
+
         static StdcallEvent <AddressList<0x4E9EF3, H_CALL>, PRIORITY_BEFORE, ArgPickN<signed char, 0>, void(signed char)> onGetRadioStationName;
         onGetRadioStationName += [](signed char station) {
             switch (station)
@@ -111,6 +118,7 @@ private:
         };
 
         patch::RedirectCall({ 0x747476 }, SetSaveDirectoryHook);
+        patch::RedirectJump({ 0x439600 }, JetPackCheatHook);
     }
 
     void PrintText2ScreenFromWorldPos(const std::string text, const CVector& posn, CRGBA color) const
