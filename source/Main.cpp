@@ -3,6 +3,9 @@
 #include "CSprite.h"
 #include "CFont.h"
 #include "CTheScripts.h"
+#include "CPathFind.h"
+#include "CPlayerInfo.h"
+#include "CNodeAddress.h"
 
 
 #include <iostream>
@@ -42,6 +45,8 @@ public:
 private:
     const CVector* pathnode_from_pos;
     const CVector* pathnode_to_pos;
+    CVector* pTargetedPedPos;
+    float* fTargetedPedRotation;
 
     void HookInstallEvents()
     {
@@ -52,6 +57,24 @@ private:
 
             if (pathnode_to_pos) {
                 PrintText2ScreenFromWorldPos("DESTINO", *pathnode_to_pos, { 0, 255, 255, 255 });
+            }
+
+            if (pTargetedPedPos) {
+                std::cout << pTargetedPedPos->x << " " << pTargetedPedPos->y << " " << pTargetedPedPos->z << " " << *fTargetedPedRotation << std::endl;
+            }
+        };
+
+        Events::gameProcessEvent += [&]() {
+            CPlayerPed* pPlayer = FindPlayerPed();
+            if (pPlayer) {
+				CPed* pTargetedPed = pPlayer->m_pPlayerTargettedPed;
+                if (pTargetedPed) {
+                    pTargetedPedPos = &pTargetedPed->GetPosition();
+                    fTargetedPedRotation = &pTargetedPed->m_fCurrentRotation;
+
+                    // FIXME: crash when attempt to call
+					CNodeAddress node = reinterpret_cast<CNodeAddress(*)(CVector, unsigned char, float, float)>(0x44FCE0)(*pTargetedPedPos, (unsigned char) 1, 1.0f, 2.0f);
+                }
             }
         };
 
@@ -124,7 +147,14 @@ private:
             void(CPathFind*, int, const CVector*, const CVector*, CNodeAddress*, CNodeAddress**)
         > onComputePathFind;
 
-        onComputePathFind += [&](CPathFind* pathFind, int nodeType, const CVector* ref_origin, const CVector* ref_dest, CNodeAddress* ref_firstNode, CNodeAddress** ref_route) mutable {
+        onComputePathFind += [&] (
+            CPathFind* pathFind, 
+            int nodeType, 
+            const CVector* ref_origin, 
+            const CVector* ref_dest, 
+            CNodeAddress* ref_firstNode, 
+            CNodeAddress** ref_route
+        ) mutable {
             std::cout << "onComputePathFind" << std::endl;
 
             pathnode_from_pos = ref_origin;
