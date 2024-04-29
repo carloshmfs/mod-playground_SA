@@ -69,6 +69,7 @@ namespace PluginPlayground {
     private:
         const CVector* pathnode_from_pos;
         const CVector* pathnode_to_pos;
+        CVector* m_nodeAddrPos;
         CVector* pTargetedPedPos;
         float* fTargetedPedRotation;
 
@@ -84,6 +85,10 @@ namespace PluginPlayground {
 
                 if (pathnode_to_pos) {
                     PrintText2ScreenFromWorldPos("DESTINO", *pathnode_to_pos, { 0, 255, 255, 255 });
+                }
+
+                if (m_nodeAddrPos) {
+                    PrintText2ScreenFromWorldPos("NODE", *m_nodeAddrPos, { 255, 0, 0, 255 });
                 }
 
                 if (pTargetedPedPos) {
@@ -203,8 +208,13 @@ namespace PluginPlayground {
             ) mutable {
                     std::cout << "onComputePathFind" << std::endl;
 
+                    CPathNode* addrNode = ThePaths.GetPathNode(nodeRoute);
+                    CVector nodePos = addrNode->GetNodeCoors();
+
                     pathnode_from_pos = ref_origin;
                     pathnode_to_pos = ref_dest;
+
+                    //m_nodeAddrPos = &nodePos;
             };
 
             //static ThiscallEvent <
