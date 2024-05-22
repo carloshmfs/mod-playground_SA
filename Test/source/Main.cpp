@@ -256,7 +256,7 @@ namespace PluginPlayground {
             patch::Set<WORD>({ 0x52815B }, 0x03EB);
 
             // DISABLE WANTED LEVELS ON MILITARY ZONES
-            patch::Set<BYTE>({ 0x72DF0D }, 0xEB);
+            patch::Set<BYTE>({ 0x72DF0D }, 0xEB); // JMP Instruction
 
             // CENTER VEHICLE AND ZONE NAME MESSAGES
             patch::Set<BYTE>({ 0x58B0AE }, 0x00);
@@ -266,7 +266,7 @@ namespace PluginPlayground {
             patch::Set<BYTE>({ 0x58AE52 }, 0x3C);
 
             // DISABLE CAR GENERATOR
-            patch::Set<BYTE>({ 0x6F3F40 }, 0xC3);
+            patch::Set<BYTE>({ 0x6F3F40 }, 0xC3); // RETN Instruction
 
             // SPRINT EVERYWHERE
             patch::Set<DWORD>({ 0x55E870 }, 0xC2C03366);
