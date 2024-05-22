@@ -17,9 +17,12 @@ namespace PluginPlayground {
 
     using namespace plugin;
 
-    typedef uint8_t uint8;
-    typedef uint16_t  uint16;
-    typedef int32_t   int32;
+    typedef uint8_t        uint8;
+    typedef uint16_t       uint16;
+    typedef int32_t        int32;
+    typedef unsigned char  BYTE;
+    typedef unsigned short WORD;
+    typedef unsigned long  DWORD;
 
     // CPathFind.h
     enum class ePathType : uint8 {
@@ -80,21 +83,21 @@ namespace PluginPlayground {
 
             Events::drawHudEvent += [&]() {
                 if (pathnode_from_pos) {
-                    PrintText2ScreenFromWorldPos("ORIGEM", *pathnode_from_pos, { 0, 0, 255, 255 });
+                    //PrintText2ScreenFromWorldPos("ORIGEM", *pathnode_from_pos, { 0, 0, 255, 255 });
                 }
 
                 if (pathnode_to_pos) {
-                    PrintText2ScreenFromWorldPos("DESTINO", *pathnode_to_pos, { 0, 255, 255, 255 });
+                    //PrintText2ScreenFromWorldPos("DESTINO", *pathnode_to_pos, { 0, 255, 255, 255 });
                 }
 
                 if (m_nodeAddrPos) {
-                    PrintText2ScreenFromWorldPos("NODE", *m_nodeAddrPos, { 255, 0, 0, 255 });
+                    //PrintText2ScreenFromWorldPos("NODE", *m_nodeAddrPos, { 255, 0, 0, 255 });
                 }
 
                 if (pTargetedPedPos) {
                     std::cout << pTargetedPedPos->x << " " << pTargetedPedPos->y << " " << pTargetedPedPos->z << " " << *fTargetedPedRotation << std::endl;
                 }
-                };
+            };
 
             Events::gameProcessEvent += [&]() mutable {
 
@@ -208,11 +211,11 @@ namespace PluginPlayground {
             ) mutable {
                     std::cout << "onComputePathFind" << std::endl;
 
-                    CPathNode* addrNode = ThePaths.GetPathNode(nodeRoute);
-                    CVector nodePos = addrNode->GetNodeCoors();
+                    //CPathNode* addrNode = ThePaths.GetPathNode(nodeRoute);
+                    //CVector nodePos = addrNode->GetNodeCoors();
 
-                    pathnode_from_pos = ref_origin;
-                    pathnode_to_pos = ref_dest;
+                    //pathnode_from_pos = ref_origin;
+                    //pathnode_to_pos = ref_dest;
 
                     //m_nodeAddrPos = &nodePos;
             };
@@ -235,9 +238,34 @@ namespace PluginPlayground {
             //    std::cout << "onPedTaskPathSearch" << std::endl;
             //};
 
-            patch::RedirectCall({ 0x747476 }, SetSaveDirectoryHook);
+            //patch::RedirectCall({ 0x747476 }, SetSaveDirectoryHook);
             //patch::RedirectCall({ 0x424454 }, FindNodeClosestToCoorsHook, true);
-            patch::RedirectJump({ 0x439600 }, JetPackCheatHook);
+            //patch::RedirectJump({ 0x439600 }, JetPackCheatHook);
+
+            //patch::Set<BYTE>({ 0x468EB5 }, 0xEB);
+            //patch::Set<BYTE>({ 0x468EB6 }, 0x32);
+
+            // DISABLE CINEMATIC CAMERA ON TRAINS
+            patch::Set<WORD>({ 0x52A50B }, 0x29EB);
+            patch::Set<BYTE>({ 0x528152 }, 0x52);
+            patch::Set<WORD>({ 0x52815B }, 0x03EB);
+
+            // DISABLE WANTED LEVELS ON MILITARY ZONES
+            patch::Set<BYTE>({ 0x72DF0D }, 0xEB);
+
+            // CENTER VEHICLE AND ZONE NAME MESSAGES
+            patch::Set<BYTE>({ 0x58B0AE }, 0x00);
+            patch::Set<BYTE>({ 0x58AD56 }, 0x00);
+            patch::Set<float>({ 0x85953C }, 320.0f);
+            patch::Set<BYTE>({ 0x58B149 }, 0x3C);
+            patch::Set<BYTE>({ 0x58AE52 }, 0x3C);
+
+            // DISABLE CAR GENERATOR
+            patch::Set<BYTE>({ 0x6F3F40 }, 0xC3);
+
+            // SPRINT EVERYWHERE
+            patch::Set<DWORD>({ 0x55E870 }, 0xC2C03366);
+            patch::Set<WORD>({ 0x55E874 }, 0x0004);
         }
 
         void PrintText2ScreenFromWorldPos(const std::string text, const CVector& posn, CRGBA color) const
