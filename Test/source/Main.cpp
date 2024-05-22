@@ -193,6 +193,11 @@ namespace PluginPlayground {
                 }
                 };
 
+            static CdeclEvent <AddressList<0x5D5323, H_CALL>, PRIORITY_BEFORE, ArgPick2N<unsigned char*, 0, unsigned short, 1>, void* (unsigned char*, unsigned short)> onStartNewScript;
+            onStartNewScript += [](unsigned char*, unsigned short) {
+                std::cout << "onStartNewScript" << std::endl;
+            };
+
 
             static ThiscallEvent <
                 AddressList<0x66F049, H_CALL>,
@@ -266,6 +271,8 @@ namespace PluginPlayground {
             // SPRINT EVERYWHERE
             patch::Set<DWORD>({ 0x55E870 }, 0xC2C03366);
             patch::Set<WORD>({ 0x55E874 }, 0x0004);
+
+
         }
 
         void PrintText2ScreenFromWorldPos(const std::string text, const CVector& posn, CRGBA color) const
