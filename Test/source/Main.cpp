@@ -271,6 +271,11 @@ namespace PluginPlayground {
             // SPRINT EVERYWHERE
             patch::Set<DWORD>({ 0x55E870 }, 0xC2C03366);
             patch::Set<WORD>({ 0x55E874 }, 0x0004);
+            
+
+            // BUG 0x858624
+            // fOne
+            //patch::Set<float>({ 0x858624 }, 0.95f);
 
 
         }
