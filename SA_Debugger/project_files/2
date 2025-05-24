@@ -1,0 +1,470 @@
+#include <plugin.h>
+#include <CTheScripts.h>
+#include <CRunningScript.h>
+#include <CPathFind.h>
+#include <CFont.h>
+#include <CSprite.h>
+#include <CPools.h>
+#include <CCutsceneMgr.h>
+#include <CGangWars.h>
+#include <CGame.h>
+#include <CGameLogic.h>
+#include <CCarCtrl.h>
+#include <CGeneral.h>
+#include <CTimer.h>
+#include <CTrain.h>
+#include <CPlane.h>
+#include <CCamera.h>
+#include <CVehicle.h>
+#include <CPad.h>
+#include <CZone.h>
+#include <CText.h>
+#include <CNodeAddress.h>
+#include <Other.h>
+#include <CStreaming.h>
+#include <CCivilianPed.h>
+#include <CPopulation.h>
+#include <CWorld.h>
+#include <CTaskComplexWanderStandard.h>
+#include <eTaskType.h>
+#include <CTheZones.h>
+
+#include <spdlog/spdlog.h>
+
+#include <Windows.h>
+#include <iostream>
+#include <cstdint>
+#include <string>
+#include <format>
+#include <functional>
+#include <cstdint>
+
+#include "InputManager.h"
+
+enum {
+    VK_W = 87,
+    VK_A = 65,
+    VK_S = 83,
+    VK_D = 68,
+};
+
+constexpr bool IS_SAMP_CHEAT = false;
+
+const std::array pedModelIds = { 0, 7, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 32, 33, 34, 35, 36, 37, 43, 44, 45, 46,
+    47, 48, 49, 50, 51, 52, 57, 58, 59, 60, 61, 62, 66, 67, 68, 70, 71, 72, 73, 78, 79, 80, 81, 82, 83, 84, 94, 95, 96, 97, 98, 99, 100, 101,
+    102, 103, 104, 105, 106, 107, 108, 109, 110, 111, 112, 113, 114, 115, 116, 117, 118, 120, 121, 122, 123, 124, 125, 126, 127, 128, 132,
+    133, 134, 135, 136, 137, 142, 143, 144, 146, 147, 153, 154, 155, 156, 158, 159, 160, 161, 162, 163, 164, 165, 166, 167, 168, 170, 171,
+    173, 174, 175, 176, 177, 179, 180, 181, 182, 183, 184, 185, 186, 187, 188, 189, 200, 202, 203, 204, 206, 209, 210, 212, 213, 217, 220,
+    221, 222, 223, 227, 228, 229, 230, 234, 235, 236, 239, 240, 241, 242, 247, 248, 249, 250, 252, 253, 254, 255, 258, 259, 260, 261, 262,
+    9, 10, 11, 12, 13, 31, 38, 39, 40, 41, 53, 54, 55, 56, 63, 64, 69, 75, 76, 77, 85, 87, 88, 89, 90, 91, 92, 93, 129, 130, 131, 138, 139,
+    140, 141, 145, 148, 150, 151, 152, 157, 169, 172, 178, 190, 191, 192, 193, 194, 195, 196, 197, 198, 199, 201, 205, 207, 211, 214, 215,
+    216, 218, 219, 224, 225, 226, 231, 232, 233, 237, 238, 243, 244, 245, 246, 251, 256, 257, 263 };
+
+class SA_Debugger {
+private:
+    bool m_bIsNoClipActive = false;
+    CPed* m_lastTargetedPedByPlayer = nullptr;
+
+public:
+    SA_Debugger() {
+        // Open the console for stdout logging
+        if (AllocConsole()) {
+            FILE* fs{};
+            freopen_s(&fs, "CONIN$", "r", stdin);
+            freopen_s(&fs, "CONOUT$", "w", stdout);
+            freopen_s(&fs, "CONOUT$", "w", stderr);
+        }
+
+        plugin::Events::initGameEvent += [&]() -> void {
+            // Initialize the input manager
+            /*
+            if (!m_theInputMgr.Initialize()) {
+                spdlog::error("Failed to initialize input manager");
+                return;
+            }
+            */
+
+            // Register the input manager callback
+            /*
+            m_theInputMgr.RegisterKeyBoardCallBack(
+                std::bind(&SA_Debugger::OnKeyPress, this, std::placeholders::_1, std::placeholders::_2)
+            );
+            */
+        };
+
+        static int keyPressTime = 0;
+        plugin::Events::gameProcessEvent += [&]() -> void {
+            if (FindPlayerPed() && plugin::KeyPressed(VK_F8) && CTimer::m_snTimeInMilliseconds - keyPressTime > 500) {
+                keyPressTime = CTimer::m_snTimeInMilliseconds;
+
+                for (int i = 0; i < 39; ++i) {
+                    auto zone = CTheZones::MapZoneArray[i];
+                    auto zoneName = zone.GetTranslatedName();
+
+                    while (*zoneName != '\0') {
+                        ++zoneName;
+                    }
+                }
+            }
+
+            if (FindPlayerPed() && plugin::KeyPressed(VK_F9) && CTimer::m_snTimeInMilliseconds - keyPressTime > 500) {
+                keyPressTime = CTimer::m_snTimeInMilliseconds;
+                int modelID = pedModelIds[rand() % 250];
+                CStreaming::RequestModel(modelID, 0);
+                CStreaming::LoadAllRequestedModels(false);
+                CPed* ped = new CCivilianPed(CPopulation::IsFemale(modelID) ? PED_TYPE_CIVFEMALE : PED_TYPE_CIVMALE, modelID);
+                if (ped) {
+                    ped->SetPosn(FindPlayerPed()->TransformFromObjectSpace(CVector(0.0f, 5.0f, 3.0f)));
+                    ped->SetOrientation(0.0f, 0.0f, 0.0f);
+                    CWorld::Add(ped);
+                    ped->PositionAnyPedOutOfCollision();
+                    ped->m_pIntelligence->m_TaskMgr.SetTask(new CTaskComplexWanderStandard(4, rand() % 8, true), 4, false);
+                }
+            }
+
+            if (auto* player = FindPlayerPed()) {
+                if (auto targetedPed = player->m_pPlayerTargettedPed) {
+                    m_lastTargetedPedByPlayer = targetedPed;
+                    spdlog::info("COISAS 2");
+                }
+            }
+
+            auto handleWanderTask = [&](CTaskComplexWander* task) -> void {
+                if (task == nullptr) {
+                    return;
+                }
+
+                if (task->m_LastNode.m_nAreaId != (uint16_t)-1 && !task->m_LastNode.IsEmpty()) {
+                    CPathNode& lastPathNode = ThePaths.m_pPathNodes[task->m_LastNode.m_nAreaId][task->m_LastNode.m_nNodeId];
+                    auto       nodePos = lastPathNode.GetNodeCoors();
+                    auto       color = CRGBA(0, 255, 0, 255).ToIntARGB();
+                    RenderLineNoClipping(nodePos + CVector{ 0.f, 0.f, 0.5f }, nodePos - CVector{ 0.f, 0.f, 0.5f }, color, color);
+                    spdlog::info("WANDER 1 {} {} {}", nodePos.x, nodePos.y, nodePos.z);
+                }
+
+                if (task->m_NextNode.m_nAreaId != (uint16_t)-1 && !task->m_NextNode.IsEmpty()) {
+                    CPathNode& nextPathNode = ThePaths.m_pPathNodes[task->m_NextNode.m_nAreaId][task->m_NextNode.m_nNodeId];
+                    auto       nodePos = nextPathNode.GetNodeCoors();
+                    auto       color = CRGBA(0, 0, 255, 255).ToIntARGB();
+                    RenderLineNoClipping(nodePos + CVector{ 0.f, 0.f, 0.5f }, nodePos - CVector{ 0.f, 0.f, 0.5f }, color, color);
+                    spdlog::info("WANDER 2 {} {} {}", nodePos.x, nodePos.y, nodePos.z);
+                }
+
+                if (task->m_LastNode.m_nAreaId != (uint16_t)-1 && !task->m_LastNode.IsEmpty() && task->m_NextNode.m_nAreaId != (uint16_t)-1 && !task->m_NextNode.IsEmpty()) {
+                    CPathNode& lastPathNode = ThePaths.m_pPathNodes[task->m_LastNode.m_nAreaId][task->m_LastNode.m_nNodeId];
+                    auto       lastNodePos = lastPathNode.GetNodeCoors() + CVector{ 0.f, 0.f, 0.4f };
+                    CPathNode& nextPathNode = ThePaths.m_pPathNodes[task->m_NextNode.m_nAreaId][task->m_NextNode.m_nNodeId];
+                    auto       nextNodePos = nextPathNode.GetNodeCoors() + CVector{ 0.f, 0.f, 0.4f };
+                    auto       startColor = CRGBA(0, 255, 0, 255).ToIntARGB();
+                    auto       endColor = CRGBA(0, 0, 255, 255).ToIntARGB();
+                    RenderLineNoClipping(lastNodePos, nextNodePos, startColor, endColor);
+                    spdlog::info("WANDER 3 {} {} {}", nextNodePos.x, nextNodePos.y, nextNodePos.z);
+                }
+                spdlog::info("WANDER");
+            };
+
+            auto handleTask = [&](CTask* task) -> void {
+                if (task && task->GetId() != eTaskType::TASK_COMPLEX_WANDER) {
+                    return;
+                }
+
+                handleWanderTask(reinterpret_cast<CTaskComplexWander*>(task));
+            };
+
+            if (m_lastTargetedPedByPlayer) {
+                if (auto pedIntelligence = m_lastTargetedPedByPlayer->m_pIntelligence) {
+                    std::vector<CTask*> pedTasks(7);
+
+                    for (auto secTask : pedIntelligence->m_TaskMgr.m_aPrimaryTasks) {
+                        pedTasks.push_back(secTask);
+                    }
+                    
+                    for (auto secTask : pedIntelligence->m_TaskMgr.m_aSecondaryTasks) {
+                        pedTasks.push_back(secTask);
+                    }
+
+                    for (auto task : pedTasks) {
+                        handleTask(task);
+                    }
+                }
+            }
+
+
+            // m_theInputMgr.ProcessInput();
+
+            /*
+            auto player = FindPlayerPed();
+            if (player) {
+                player->m_bUsesCollision = false;
+            }
+             */
+
+            //auto cameraTargetPoint = TheCamera.m_vecMoveLinear;
+
+            if (IsKeyPressed('W')) {
+            /*
+                if (player) {
+                    const auto cameraPosition = TheCamera.GetGameCamPosition();
+                    const auto cameraDirection = TheCamera.GetLookDirection();
+                    auto cameraTargetPoint = TheCamera.m_vecAimingTargetCoors;
+
+                    cameraTargetPoint.x -= cameraPosition->x;
+                    cameraTargetPoint.y -= cameraPosition->x;
+                    cameraTargetPoint.z -= cameraPosition->z;
+
+                    cameraTargetPoint.x *= 0.5f;
+                    cameraTargetPoint.y *= 0.5f;
+                    cameraTargetPoint.z *= 0.5f;
+
+                    player->SetPosn(cameraTargetPoint);
+                }
+             */
+            }
+            
+            if (IsKeyPressed('S')) {
+            /*
+                if (player) {
+                    const auto cameraPosition = TheCamera.GetGameCamPosition();
+                    const auto cameraDirection = TheCamera.GetLookDirection();
+                    auto cameraTargetPoint = TheCamera.m_vecTargetWhenInterPol;
+
+                    cameraTargetPoint.x -= cameraPosition->x;
+                    cameraTargetPoint.y -= cameraPosition->x;
+                    cameraTargetPoint.z -= cameraPosition->z;
+
+                    cameraTargetPoint.x *= -1.0f;
+                    cameraTargetPoint.y *= -1.0f;
+                    cameraTargetPoint.z *= -1.0f;
+
+                    player->SetPosn(cameraTargetPoint);
+                }
+             */
+            }
+
+            // spdlog::info("CAMERA_POS: {} {} {}", cameraPosition->x, cameraPosition->y, cameraPosition->z);
+            // spdlog::info("CAMERA_DIRECTION: {}", cameraDirection);
+            // spdlog::info("camera_direction: {} {} {}", cameraTargetPoint.x, cameraTargetPoint.y, cameraTargetPoint.z);
+
+
+
+            // IS ANSWERING CALL
+            // spdlog::info("Calls answered {0:x}", CTheScripts::ScriptSpace[4 * 1414]);
+
+            //spdlog::info("ON_MISSION: {0:x}", CTheScripts::ScriptSpace[CTheScripts::OnAMissionFlag]);
+            // spdlog::info("RECAL_TIME: {}", reinterpret_cast<int>(&CTheScripts::ScriptSpace[1630]));
+        };
+
+        ApplyPatches();
+        ApplyHooks();
+
+        plugin::Events::drawHudEvent += []() -> void {
+            //CTheScripts::ScriptSpace[CTheScripts::OnAMissionFlag] = 0;
+            //spdlog::info("onGameProcessEvent > ON_MISSION: {0:x}", CTheScripts::ScriptSpace[CTheScripts::OnAMissionFlag]);
+
+            for (auto vehicle : CPools::ms_pVehiclePool) {
+                auto vehiclePos = vehicle->GetPosition();
+                auto vehicleAutoPilot = vehicle->m_autoPilot;
+                auto vehiclePathNode = ThePaths.GetPathNode(vehicleAutoPilot.m_currentAddress);
+                //auto vehiclePathNodeCoors = vehiclePathNode->GetNodeCoors();
+                
+                // spdlog::info("OnDrawHud > vechielAutoPilot: AreaID {} NodeId {}", vehicleAutoPilot.m_currentAddress.m_nAreaId, vehicleAutoPilot.m_currentAddress.m_nNodeId);
+
+                if (vehiclePathNode) {
+                    //auto nodeCoors = vehiclePathNode->m_vecPosn;
+
+                    //std::string text = std::format("{0:.1f} {1:.1f} {2:.1f}", vehiclePathNode->GetNodeCoors().x, vehiclePathNode->GetNodeCoors().y, vehiclePathNode->GetNodeCoors().z);
+
+                    //spdlog::info(text);
+                }
+
+                //std::string text = std::format("{0:.1f} {1:.1f} {2:.1f}", vehiclePos.x, vehiclePos.y, vehiclePos.z);
+                //printText2ScreenFromWorldPos(text, vehicleAutoPilot.m_vecDestinationCoors, plugin::color::Aqua);
+            }
+
+        };
+	};
+
+    static void RenderLineNoClipping(const CVector& start, const CVector& end, uint32_t startColor, uint32_t endColor)
+    {
+        return plugin::Call<0x6FF460, float, float, float, float, float, float, uint32_t, uint32_t>(start.x, start.y, start.z, end.x, end.y, end.z, startColor, endColor);
+    }
+
+    static bool IsKeyPressed(int32_t virtualKey)
+    {
+        return GetKeyState(virtualKey) & 0x8000;
+    }
+
+    void ApplyPatches()
+    {
+        plugin::patch::RedirectCall(0x5519E5, TestRedirect);
+        //plugin::patch::RedirectCall(0x53C1C1, GenerateRandomCars);
+
+
+    }
+
+    void ApplyHooks()
+    {
+        static plugin::ThiscallEvent <plugin::AddressList<0x4C3BFB, plugin::H_CALL>, plugin::PRIORITY_BEFORE, plugin::ArgPick<plugin::ArgTypes<CEventHandler*, void*, CTask*, CTask*>, 0, 1, 2, 3>, void(CEventHandler*, void*, CTask*, CTask*)> onEventVehicleOnFire;
+        onEventVehicleOnFire += [&](CEventHandler*, void*, CTask*, CTask*) -> void {
+            spdlog::info("onEventVehicleOnFire()");
+        };
+
+        /*
+        static plugin::ThiscallEvent <plugin::AddressList<0x4C0BD0, plugin::H_CALL>, plugin::PRIORITY_BEFORE, plugin::ArgPick<plugin::ArgTypes<CEventHandler*, void*, CTask*, CTask*>, 0, 1, 2, 3>, void(CEventHandler*, void*, CTask*, CTask*)> onComputeVehiclePotentialCollisionEvent;
+        onComputeVehiclePotentialCollisionEvent += [&](CEventHandler*, void*, CTask*, CTask*) -> void {
+            spdlog::info("onComputeVehiclePotentialCollisionEvent()");
+        };
+        */
+
+        static plugin::CdeclEvent <plugin::AddressList<0x464C20, plugin::H_JUMP>, plugin::PRIORITY_BEFORE, plugin::ArgPickN<unsigned char*, 0>, void* (unsigned char*)> onStartNewScript;
+        onStartNewScript += [](unsigned char* startIP) -> void {
+            auto runningScript = reinterpret_cast<CRunningScript*>(startIP);
+            // spdlog::info("onStartNewScript > Starting Script: {}", TheText.Get(runningScript->m_szName));
+        };
+
+        static plugin::CdeclEvent <plugin::AddressList<0x53C1C1, plugin::H_CALL>, plugin::PRIORITY_BEFORE, plugin::ArgPickNone, void()> onGenerateRandomCars;
+        onGenerateRandomCars += [&]() -> void {
+            // spdlog::info("timeNextMadDriverChaseCreated: {}", plugin::patch::GetFloat(0x9690BC));
+            // spdlog::info("timeStep: {}", CTimer::ms_fTimeStep);
+            // spdlog::info("cutsceneTimer: {}", CCutsceneMgr::ms_cutsceneTimer);
+        };
+
+        static plugin::ThiscallEvent <plugin::AddressList<0x452760, plugin::H_JUMP>, plugin::PRIORITY_AFTER, plugin::ArgPick6N<CPathFind*, 0, uint8_t, 1, const CVector&, 2, const CVector&, 3, const CNodeAddress&, 4, CNodeAddress*, 5>, void(CPathFind*, uint8_t, const CVector&, const CVector&, const CNodeAddress&, CNodeAddress*)> onComputeRoute;
+        onComputeRoute += [&](CPathFind*, uint8_t nodeType, const CVector& vecStart, const CVector& vecEnd, const CNodeAddress& startAddress, CNodeAddress* route) -> void {
+            spdlog::info("onComputeRoute()");
+
+            auto* pathNode = &ThePaths.m_pPathNodes[route->m_nAreaId][route->m_nNodeId];
+
+            if (pathNode) {
+                spdlog::info("onComputeRoute() NOT NULL");
+                auto* next = reinterpret_cast<CPathNode*>(pathNode->ptr);
+                auto* previous = reinterpret_cast<CPathNode*>(pathNode->ptr2);
+            }
+        };
+    }
+
+    static void TestRedirect(const char* str)
+    {
+        spdlog::info("HELLO WORLD {}", str);
+    }
+
+    static void GenerateRandomCars()
+    {
+        bool bIsCutsceneRunning = CCutsceneMgr::ms_running;
+        if (bIsCutsceneRunning) {
+            // CCarCtrl::CountDownToCarsAtStart = 2
+            plugin::patch::SetInt(0x9690C0, 2);
+            return;
+        }
+
+        // check if a gang war is happening
+        // _isGangWarActive
+        if (plugin::CallAndReturn<bool, 0x4439C0>()) {
+            return;
+        }
+
+        // check if player is not in any interior
+        if (CGame::currArea != 0) {
+            return;
+        }
+
+        // CCarCtrl::TimeNextMadDriverChaseCreated
+        float timeNextMadDriverChaseCreated = plugin::patch::GetFloat(0x9690BC);
+
+        if (!CGameLogic::LaRiotsActiveHere()) {
+            // TODO: AQUI PRECISA SER REVISADO
+            if (timeNextMadDriverChaseCreated <= 0 || timeNextMadDriverChaseCreated == 480.0f) {
+                float NewTimeNextMadDriverChaseCreated = CGeneral::GetRandomNumberInRange(480.0f, 240.0f);
+                plugin::patch::SetFloat(0x9690BC, NewTimeNextMadDriverChaseCreated);
+            }
+        }
+
+        float timeStep = CTimer::ms_fTimeStep;
+        // CCarCtrl::NumRandomCars
+        int32_t numRandomCars = plugin::patch::GetInt(0x969094);
+
+        float NewTimeNextMadDriverChaseCreated = (timeStep * CCutsceneMgr::ms_cutsceneTimer) - timeNextMadDriverChaseCreated;
+        plugin::patch::SetFloat(0x9690BC, NewTimeNextMadDriverChaseCreated);
+
+        if (!(numRandomCars >= 45)) {
+            // CCarCtrl::CountDownToCarsAtStart
+            int8_t CountDownToCarsAtStart = plugin::patch::Get<int8_t>(0x9690C0);
+
+            if (!CountDownToCarsAtStart) {
+                CCarCtrl::GenerateOneRandomCar();
+                CCarCtrl::GenerateOneRandomCar();
+            }
+            else {
+                CountDownToCarsAtStart--;
+                plugin::patch::Set<int8_t>(0x9690C0, CountDownToCarsAtStart);
+
+                for (int i = 0; i <= 100; i++) {
+                    CCarCtrl::GenerateOneRandomCar();
+                }
+
+                // CTheCarGenerators::GenerateEvenIfPlayerIsCloseCounter
+                plugin::patch::Set<int8_t>(0xC279D0, 20);
+            }
+        }
+
+        CTrain::DoTrainGenerationAndRemoval();
+        CPlane::DoPlaneGenerationAndRemoval();
+
+        int previousTimeInMilliseconds = CTimer::m_snPreviousTimeInMilliseconds;
+        int timeInMilliseconds = CTimer::m_snTimeInMilliseconds;
+
+        // TODO: Make this code more human readable
+        if (((previousTimeInMilliseconds - timeInMilliseconds) & 0xFFFFF000) != 0) {
+            return;
+        }
+
+        CCarCtrl::GenerateEmergencyServicesCar();
+    }
+
+    void OnKeyPress(unsigned char key, PressState state)
+    {
+        if (state == PRESS_DOWN) {
+            switch (key)
+            {
+            case DIK_MINUS:
+            {
+                spdlog::info("ME APERTARAM!!");
+                auto player = FindPlayerPed();
+                if (player) {
+                    auto pVehicle = player->m_pVehicle;
+                    if (pVehicle) {
+                        spdlog::info("Calling function!!");
+                        MessageBox(0, "CHAMANDO FUNCAO", "Error", MB_OK);
+                        plugin::Call<0x42F870, CVehicle*, const CVector&, bool, bool > (pVehicle, {0,0,0}, false, false);
+                    }
+                }
+                break;
+            }
+            default:
+                break;
+            }
+        }
+    }
+
+    void Draw2DTextOnWorld(const std::string text, CVector& posn, CRGBA color)
+    {
+        RwV3d rwp = { posn.x, posn.y, posn.z + 1.0f };
+        RwV3d screenCoors;
+        float w, h;
+
+        if (CSprite::CalcScreenCoors(rwp, &screenCoors, &w, &h, true, true)) {
+            CFont::SetOrientation(ALIGN_CENTER);
+            CFont::SetColor(color);
+            CFont::SetDropShadowPosition(1);
+            CFont::SetBackground(false, false);
+            CFont::SetWrapx(500.0);
+            CFont::SetScale(0.25, 0.5);
+            CFont::SetFontStyle(FONT_SUBTITLES);
+            CFont::SetProportional(true);
+            CFont::PrintString(screenCoors.x, screenCoors.y, text.c_str());
+        }
+    }
+
+private:
+    // InputManager m_theInputMgr;
+} SA_DebuggerPlugin;
