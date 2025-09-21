@@ -10,5 +10,6 @@
     <ClInclude Include="..\source\InputManager.h" />
     <ClInclude Include="..\source\Utils.h" />
     <ClInclude Include="Callback.h" />
+    <ClInclude Include="CPopCycle.h" />
   </ItemGroup>
 </Project>

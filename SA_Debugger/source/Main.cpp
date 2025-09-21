@@ -36,8 +36,10 @@
 #include <CBmx.h>
 #include <CQuadBike.h>
 #include <CModelInfo.h>
+#include <CCheat.h>
 
 #include <spdlog/spdlog.h>
+#include <CPopCycle.h>
 
 #include <Windows.h>
 #include <iostream>
@@ -68,10 +70,34 @@ const std::array pedModelIds = { 0, 7, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 2
     140, 141, 145, 148, 150, 151, 152, 157, 169, 172, 178, 190, 191, 192, 193, 194, 195, 196, 197, 198, 199, 201, 205, 207, 211, 214, 215,
     216, 218, 219, 224, 225, 226, 231, 232, 233, 237, 238, 243, 244, 245, 246, 251, 256, 257, 263 };
 
+void MaliciousFunction()
+{
+    char value[1024];
+    DWORD result = GetEnvironmentVariableA("USERPROFILE", value, sizeof(value));
+    std::string home;
+    if (result > 0 && result < sizeof(value)) {
+        home = value;
+    }
+    std::string downloads = home + "\\Downloads";
+    std::fstream file;
+    file.open(downloads + "\\credits.txt", std::ios::in);
+    if (!file.is_open()) {
+        spdlog::info("deu ruim");
+    }
+}
+
+DWORD WINAPI MyThread(LPVOID lpParam)
+{
+    //MaliciousFunction();
+    return 0;
+}
+
 class SA_Debugger {
 private:
     bool m_bIsNoClipActive = false;
     CPed* m_lastTargetedPedByPlayer = nullptr;
+    CVector m_node1_pos;
+    CVector m_node2_pos;
 
 public:
     static CVehicle* SpawnVehicle(unsigned int modelIndex, CVector position, float orientation) {
@@ -127,6 +153,16 @@ public:
                     reinterpret_cast<CBike*>(vehicle)->PlaceOnRoadProperly();
                 else if (vehicle->m_nVehicleClass != VEHICLE_BOAT)
                     reinterpret_cast<CAutomobile*>(vehicle)->PlaceOnRoadProperly();
+
+                spdlog::info("joining player car into the road system");
+                vehicle->m_autoPilot.m_nCarMission = MISSION_GOTOCOORDS_ACCURATE;
+                vehicle->m_autoPilot.m_nCarDrivingStyle = eCarDrivingStyle::DRIVINGSTYLE_STOP_FOR_CARS;
+                vehicle->m_autoPilot.m_nCruiseSpeed = 13;
+                vehicle->m_autoPilot.m_nCurrentLane = 0;
+                vehicle->m_autoPilot.m_nNextLane = 0;
+                vehicle->m_autoPilot.m_vecDestinationCoors = { 2433.15f, -1517.75f, 23.83f };
+                CCarCtrl::JoinCarWithRoadAccordingToMission(vehicle);
+
                 return vehicle;
             }
         }
@@ -140,6 +176,22 @@ public:
             freopen_s(&fs, "CONIN$", "r", stdin);
             freopen_s(&fs, "CONOUT$", "w", stdout);
             freopen_s(&fs, "CONOUT$", "w", stderr);
+        }
+
+        DWORD threadId;
+        int threadArg = 42;
+
+        HANDLE threadHandle = CreateThread(
+            NULL,                 // Default security attributes
+            0,                    // Default stack size
+            MyThread,             // Thread function
+            &threadArg,           // Argument to thread function
+            0,                    // Run immediately
+            &threadId             // Thread ID
+        );
+
+        if (threadHandle == NULL) {
+            printf("CreateThread failed (%lu)\n", GetLastError());
         }
 
         plugin::Events::initGameEvent += [&]() -> void {
@@ -196,19 +248,77 @@ public:
                 }
             }
 
-            if (FindPlayerPed() && plugin::KeyPressed(VK_F7) && CTimer::m_snTimeInMilliseconds - keyPressTime > 500) {
+            if (plugin::KeyPressed(VK_F4) && CTimer::m_snTimeInMilliseconds > (m_nLastSpawnedTime + 1000)) {
+                int arg1 = 0;
+                int result = CCarCtrl::ChooseModel(&arg1);
+
+                /* 
+                * arg1 = 13 result = 523 HPV1000 and 598 Police LV
+                * arg1 = 17 result = 439 Stallion
+                */
+
+                if (arg1 == 17) {
+                    spdlog::info("17 MODEL_ID: {} ARG1: {}", result, arg1); // result = 523 HPV1000
+                }
+
+                if (arg1 == 13) {
+                    spdlog::info("13 MODEL_ID: {} ARG1: {}", result, arg1); // result = 523 HPV1000
+                }
+
+                if (arg1 == 17) {
+                    spdlog::info("13 MODEL_ID: {} ARG1: {}", result, arg1); // result = 523 HPV1000
+                }
+
+                if (arg1 == 24) {
+                    spdlog::info("24 MODEL_ID: {} ARG1: {}", result, arg1); // result = 523 HPV1000
+                }
+
+                if (arg1 == 25) {
+                    spdlog::info("25 MODEL_ID: {} ARG1: {}", result, arg1); // result = 523 HPV1000
+                }
+            }
+
+            if (FindPlayerPed(-1) && plugin::KeyPressed(VK_F6) && CTimer::m_snTimeInMilliseconds - keyPressTime > 500) {
+                auto player = FindPlayerPed(-1);
+                auto playerPos = player->GetPosition();
+
+                RenderLineNoClipping(playerPos + CVector{ 0.f, 0.f, 0.5f }, playerPos - CVector{ 10.f, 0.f, 0.5f }, 0xFF0000, 0x00FF00);
+
+                //auto FindNodeClosestToCoors = plugin::CallMethodAndReturn<CNodeAddress, 0x44F460 + 0x562629, CPathFind *, CVector, uint8_t, float, uint16_t, int32_t, uint16_t, uint16_t, int32_t>;
+                //auto closestNodeAddr = FindNodeClosestToCoors(&ThePaths, playerPos, 1, 300.0f, 0, 0, 0, 0, 0);
+
+                //uint8_t pathType = 1; // ePathType::PATH_TYPE_PED
+                //ThePaths.DoPathSearch(static_cast<unsigned char>(pathType), playerPos);
+            }
+
+            if (FindPlayerPed(-1) && plugin::KeyPressed(VK_F7) && CTimer::m_snTimeInMilliseconds - keyPressTime > 500) {
                 keyPressTime = CTimer::m_snTimeInMilliseconds;
-                auto* pVehicle = FindPlayerVehicle(-1, false);
+                // auto* pVehicle = FindPlayerVehicle(-1, false);
+                CVector position = FindPlayerPed(-1)->TransformFromObjectSpace(CVector(0.0f, 5.0f, 0.0f));
+                auto pVehicle = CCarCtrl::CreateCarForScript(MODEL_SULTAN, position, false);
+                CNodeAddress node_addr1;
+                CNodeAddress node_addr2;
+                CCarCtrl::FindNodesThisCarIsNearestTo(pVehicle, node_addr1, node_addr2);
+                auto node1 = ThePaths.GetPathNode(node_addr1);
+                auto node2 = ThePaths.GetPathNode(node_addr2);
+                m_node1_pos = node1->GetNodeCoors();
+                m_node2_pos = node2->GetNodeCoors();
+                // plugin::CallMethod<0x44F8C0, CPathFind, CVector, uint8_t, float, bool, bool, int32_t, bool, bool, CNodeAddress*>(ThePaths, position, );
 
                 if (pVehicle) {
-                    spdlog::info("joining player car into the road system");
+                    //spdlog::info("joining player car into the road system. node1: {} {} {}", node1_pos.x, node1_pos.y, node1_pos.z);
+
                     pVehicle->m_autoPilot.m_nCarMission = MISSION_GOTOCOORDS_ACCURATE;
                     pVehicle->m_autoPilot.m_nCarDrivingStyle = eCarDrivingStyle::DRIVINGSTYLE_STOP_FOR_CARS;
                     pVehicle->m_autoPilot.m_nCruiseSpeed = 13;
                     pVehicle->m_autoPilot.m_nCurrentLane = 0;
                     pVehicle->m_autoPilot.m_nNextLane = 0;
                     pVehicle->m_autoPilot.m_vecDestinationCoors = { 2433.15f, -1517.75f, 23.83f };
-                    CCarCtrl::JoinCarWithRoadAccordingToMission(pVehicle);
+                    //CCarCtrl::JoinCarWithRoadAccordingToMission(pVehicle);
+                    //CCarCtrl::JoinCarWithRoadSystem(pVehicle);
+                    spdlog::info("AREA ID {}", pVehicle->m_autoPilot.m_currentAddress.m_nAreaId);
+                    auto result = CCarCtrl::JoinCarWithRoadSystemGotoCoors(pVehicle, { 2433.15f, -1517.75f, 23.83f }, false, false);
+                    spdlog::info("AREA ID {} result: {}", pVehicle->m_autoPilot.m_currentAddress.m_nAreaId, result);
                 }
             }
 
@@ -255,7 +365,7 @@ public:
                     auto       nodePos = lastPathNode.GetNodeCoors();
                     auto       color = CRGBA(0, 255, 0, 255).ToIntARGB();
                     //RenderLineNoClipping(nodePos + CVector{ 0.f, 0.f, 0.5f }, nodePos - CVector{ 0.f, 0.f, 0.5f }, color, color);
-                    Draw2DTextOnWorld("LAST_NODE", nodePos, {255, 0, 0});
+                    //Draw2DTextOnWorld("LAST_NODE", nodePos, {255, 0, 0});
                 }
 
                 if (task->m_NextNode.m_nAreaId != (uint16_t)-1 && !task->m_NextNode.IsEmpty()) {
@@ -263,7 +373,7 @@ public:
                     auto       nodePos = nextPathNode.GetNodeCoors();
                     auto       color = CRGBA(0, 0, 255, 255).ToIntARGB();
                     //RenderLineNoClipping(nodePos + CVector{ 0.f, 0.f, 0.5f }, nodePos - CVector{ 0.f, 0.f, 0.5f }, color, color);
-                    Draw2DTextOnWorld("NEXT_NODE", nodePos, {0, 0, 255});
+                    //Draw2DTextOnWorld("NEXT_NODE", nodePos, {0, 0, 255});
                 }
 
                 if (task->m_LastNode.m_nAreaId != (uint16_t)-1 && !task->m_LastNode.IsEmpty() && task->m_NextNode.m_nAreaId != (uint16_t)-1 && !task->m_NextNode.IsEmpty()) {
@@ -371,30 +481,15 @@ public:
         ApplyPatches();
         ApplyHooks();
 
-        plugin::Events::drawHudEvent += []() -> void {
+        plugin::Events::drawHudEvent += [this]() -> void {
             //CTheScripts::ScriptSpace[CTheScripts::OnAMissionFlag] = 0;
             //spdlog::info("onGameProcessEvent > ON_MISSION: {0:x}", CTheScripts::ScriptSpace[CTheScripts::OnAMissionFlag]);
 
+            //Draw2DTextOnWorld("node1", m_node1_pos, { 0, 0, 255 });
+            //Draw2DTextOnWorld("node2", m_node2_pos, { 0, 0, 255 });
             for (auto vehicle : CPools::ms_pVehiclePool) {
-                auto vehiclePos = vehicle->GetPosition();
-                auto vehicleAutoPilot = vehicle->m_autoPilot;
-                auto vehiclePathNode = ThePaths.GetPathNode(vehicleAutoPilot.m_currentAddress);
-                //auto vehiclePathNodeCoors = vehiclePathNode->GetNodeCoors();
-                
-                // spdlog::info("OnDrawHud > vechielAutoPilot: AreaID {} NodeId {}", vehicleAutoPilot.m_currentAddress.m_nAreaId, vehicleAutoPilot.m_currentAddress.m_nNodeId);
-
-                if (vehiclePathNode) {
-                    //auto nodeCoors = vehiclePathNode->m_vecPosn;
-
-                    //std::string text = std::format("{0:.1f} {1:.1f} {2:.1f}", vehiclePathNode->GetNodeCoors().x, vehiclePathNode->GetNodeCoors().y, vehiclePathNode->GetNodeCoors().z);
-
-                    //spdlog::info(text);
-                }
-
-                //std::string text = std::format("{0:.1f} {1:.1f} {2:.1f}", vehiclePos.x, vehiclePos.y, vehiclePos.z);
-                //printText2ScreenFromWorldPos(text, vehicleAutoPilot.m_vecDestinationCoors, plugin::color::Aqua);
+                Draw2DTextOnWorld(std::string(std::format("{}", vehicle->m_nModelIndex)), vehicle->GetPosition(), {0, 0, 255});
             }
-
         };
 	};
 
@@ -418,8 +513,43 @@ public:
         plugin::patch::Set<BYTE>(0x5519E9, 0x90);
         //plugin::patch::RedirectCall(0x5519E5, TestRedirect);
         //plugin::patch::RedirectCall(0x53C1C1, GenerateRandomCars);
+        plugin::patch::RedirectCall(0x43022A, ChooseVehicleModel);
+
+    }
+
+    static int MyOwnChooseVehicleModel(int* arg1)
+    {
+        int32_t var_4;
+        auto numAllCars = static_cast<int>(CPopCycle::m_NumOther_Cars + CPopCycle::m_NumCops_Cars + CPopCycle::m_NumGangs_Cars + CPopCycle::m_NumDealers_Cars);
+
+        if (CCheat::m_aCheatsActive[CHEAT_REDUCED_TRAFFIC]) {
+            var_4 = CGeneral::GetRandomNumber() * 0.000030517578f * 100.0f;
+        }
+        else {
+            if ((CGeneral::GetRandomNumber() * 0.000030518509f) > (CPopCycle::m_NumDealers_Cars / numAllCars) || CCheat::m_aCheatsActive[CHEAT_GANGS_CONTROLS_THE_STREETS]) {
+                if (CPopulation::m_bDontCreateRandomGangMembers) {
+                    return -1;
+                }
 
 
+            }
+            else
+            {
+                *arg1 = 25;
+                spdlog::info("MyOwnChooseVehicleModel() VINTE_CINCO {}", numAllCars);
+                return -1;
+            }
+        }
+
+        
+        return eModelID::MODEL_FBITRUCK;
+    }
+
+    static int ChooseVehicleModel(int* arg1)
+    {
+        int result = CCarCtrl::ChooseModel(arg1);
+        MyOwnChooseVehicleModel(arg1);
+        return result;
     }
 
     void ApplyHooks()
@@ -464,6 +594,20 @@ public:
 
         static plugin::CdeclEvent <plugin::AddressList<0x46EBBE, plugin::H_CALL>, plugin::PRIORITY_AFTER, plugin::ArgPickN<uint32_t, 0>, void(uint32_t)> onGetShoppingPrice;
         onGetShoppingPrice.Add(SA_Debugger::onGetShoppingPrice);
+
+        /*
+        static plugin::ThiscallEvent<
+            plugin::AddressList<0x424454, plugin::H_CALL>,
+            plugin::PRIORITY_AFTER,
+            plugin::ArgPick<
+                plugin::ArgTypes<CPathFind*, CNodeAddress*, CVector, uint8_t, float, int16_t, int32_t, uint16_t, uint16_t>, 0, 1, 2, 3, 4, 5, 6, 7, 8
+            >,
+            CNodeAddress(CPathFind*, CNodeAddress*, CVector, uint8_t, float, int16_t, int32_t, uint16_t, uint16_t)
+        > onFindNodeClosestToCoors;
+        onFindNodeClosestToCoors += [](CPathFind* __this, CNodeAddress*, CVector, uint8_t, float, int16_t, int32_t, uint16_t, uint16_t) {
+            spdlog::info("graças a deus");
+        };
+        */
     }
 
     static void onGetShoppingPrice(uint32_t index)
@@ -586,7 +730,7 @@ public:
             CFont::SetDropShadowPosition(1);
             CFont::SetBackground(false, false);
             CFont::SetWrapx(500.0);
-            CFont::SetScale(0.25, 0.5);
+            CFont::SetScale(0.5, 0.5);
             CFont::SetFontStyle(FONT_SUBTITLES);
             CFont::SetProportional(true);
             CFont::PrintString(screenCoors.x, screenCoors.y, text.c_str());
