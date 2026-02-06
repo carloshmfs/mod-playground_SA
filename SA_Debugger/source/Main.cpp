@@ -48,6 +48,7 @@
 #include <format>
 #include <functional>
 #include <cstdint>
+#include <cmath>
 
 #include "InputManager.h"
 
@@ -514,7 +515,101 @@ public:
         //plugin::patch::RedirectCall(0x5519E5, TestRedirect);
         //plugin::patch::RedirectCall(0x53C1C1, GenerateRandomCars);
         plugin::patch::RedirectCall(0x43022A, ChooseVehicleModel);
+        //plugin::patch::RedirectCall(0x430050, _GenerateOneRandomCar);
+        plugin::patch::RedirectJump({ 0x430051 }, _GenerateOneRandomCar);
 
+    }
+
+    static void _GenerateOneRandomCar(void)
+    {
+        int modelType;
+        eModelID modelIndex = static_cast<eModelID>(CCarCtrl::ChooseModel(&modelType));
+        if (modelIndex <= eModelID::MODEL_NULL) {
+            return;
+        }
+
+        float a7;
+        bool arg5 = true;
+        if (TheCamera.m_mCameraMatrix.up.z >= -0.899999998f) {
+            if (CVehicle* pVehicle = FindPlayerVehicle()) {
+                float pVehSpeed = static_cast<float>(sqrt(std::pow(pVehicle->m_vecMoveSpeed.y, 2) + std::pow(pVehicle->m_vecMoveSpeed.x, 2)));
+                if (pVehSpeed > 0.40000001f) 
+                {
+                    switch ( CTimer::m_FrameCounter & 3 ) 
+                    {
+                    case 0:
+                    case 1:
+                        a7 = 0.85000002f;
+                        arg5 = false;
+                        break;
+                    case 2:
+                        a7 = 0.70700002f;
+                        break;
+                    case 3:
+                        a7 = 0.70700002;
+                        arg5 = false;
+                        break;
+                    }
+                }
+
+                if (pVehSpeed > 0.1f)
+                {
+                    switch (CTimer::m_FrameCounter & 3)
+                    {
+                    case 0:
+                        a7 = 0.85000002f;
+                        arg5 = true;
+                    case 1:
+                        a7 = 0.70700002f;
+                        break;
+                    case 2:
+                    case 3:
+                        a7 = 0.70700002f;
+                        arg5 = false;
+                        break;
+                    }
+                }
+            }
+            else {
+                if ( (CTimer::m_FrameCounter & 1) != 0 && (CTimer::m_FrameCounter & 1) == 1 ) {
+                    a7 = 0.70700002f;
+                    arg5 = false;
+                }
+            }
+        }
+
+        CVector playerPos = FindPlayerCentreOfWorld(CWorld::PlayerInFocus);
+        float radius = TheCamera.m_fCamFrontXNorm;
+        //spdlog::info("m_fCamFrontXNorm: {}", radius);
+        //float radius = 0.70700002f;
+        float radius2 = radius;
+        float radiusRef = radius;
+        a7 = -1.0f;
+        bool isLawEnforcer = false;
+        bool unk2 = false;
+        float generationDistance = TheCamera.m_fGenerationDistMultiplier * 160.0f;
+        CVector origin;
+        CNodeAddress nodeAddr1;
+        CNodeAddress nodeAddr2;
+
+        if ( ! CCarCtrl::GenerateCarCreationCoors2(playerPos, radius, radius2, a7, arg5, generationDistance, 38.0f, &origin, &nodeAddr1, &nodeAddr2, &radiusRef, isLawEnforcer, false) ) {
+            return;
+        }
+
+        auto node1Pos = ThePaths.GetPathNode(nodeAddr1)->GetNodeCoors();
+        auto node2Pos = ThePaths.GetPathNode(nodeAddr2)->GetNodeCoors();
+
+        CStreaming::RequestModel(modelIndex, eStreamingFlags::KEEP_IN_MEMORY);
+
+        CVehicle* vehicle = CCarCtrl::GetNewVehicleDependingOnCarModel(modelIndex, 1);
+        vehicle->m_autoPilot.field_8.m_nAreaId = -1;
+        vehicle->m_autoPilot.m_currentAddress = nodeAddr1;
+        vehicle->m_autoPilot.m_startingRouteNode = nodeAddr2;
+        //vehicle->m_matrix->up = node1Pos;
+        vehicle->SetPosn(node1Pos);
+        CWorld::Add(vehicle);
+
+        CCarCtrl::SetUpDriverAndPassengersForVehicle(vehicle, modelType, 1, 1, 0, 99);
     }
 
     static int MyOwnChooseVehicleModel(int* arg1)
